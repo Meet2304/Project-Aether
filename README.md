@@ -1,5 +1,5 @@
 <p align = 'center'>
-  <img src = 'https://github.com/Meet2304/Project-Icarus/blob/main/Project-Icarus-Header.jpg'>
+  <img src = 'https://github.com/Meet2304/Project-Aether/blob/main/Project-Aether-Header.png'>
 </p>
 
 <h1 align="center">Project Aether</h1>
