@@ -22,6 +22,16 @@ export const metadata: Metadata = {
   description:
     "Mobile-first skateboard trick recording. Record, clip, label and upload.",
   applicationName: "Aether",
+  manifest: "/assets/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/assets/favicon.ico", sizes: "any" },
+      { url: "/assets/favicon.svg", type: "image/svg+xml" },
+      { url: "/assets/favicon-32.png", type: "image/png", sizes: "32x32" },
+      { url: "/assets/favicon-16.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: "/assets/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Video } from "lucide-react";
+import { Video, Play } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import type { ClipRecord } from "@/lib/types";
 import { formatTimePrecise } from "@/lib/clipUtils";
 import { Badge } from "@/components/ui/badge";
+import { Logo } from "@/components/Logo";
+import ClipPlayer from "@/components/ClipPlayer";
 
 export default function HomePage() {
   const [clips, setClips] = useState<ClipRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeClip, setActiveClip] = useState<ClipRecord | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -51,11 +54,14 @@ export default function HomePage() {
     <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-10">
       {/* Masthead */}
       <header className="flex items-center justify-between border-b border-foreground py-4">
-        <div>
-          <h1 className="text-2xl font-extrabold leading-none tracking-tight">
-            AETHER
-          </h1>
-          <p className="label-mono mt-1">Trick Recorder</p>
+        <div className="flex items-center gap-3">
+          <Logo showWordmark={false} size={44} />
+          <div>
+            <h1 className="text-2xl font-extrabold leading-none tracking-tight">
+              AETHER
+            </h1>
+            <p className="label-mono mt-1">Trick Recorder</p>
+          </div>
         </div>
         <span className="label-mono text-foreground">
           {String(clips.length).padStart(2, "0")}&nbsp;clips
@@ -129,18 +135,30 @@ export default function HomePage() {
               </div>
               <div className="space-y-2">
                 {items.map((clip) => (
-                  <RecentClipRow key={clip.id} clip={clip} />
+                  <RecentClipRow
+                    key={clip.id}
+                    clip={clip}
+                    onSelect={() => setActiveClip(clip)}
+                  />
                 ))}
               </div>
             </div>
           ))}
         </div>
       </section>
+
+      <ClipPlayer clip={activeClip} onClose={() => setActiveClip(null)} />
     </main>
   );
 }
 
-function RecentClipRow({ clip }: { clip: ClipRecord }) {
+function RecentClipRow({
+  clip,
+  onSelect,
+}: {
+  clip: ClipRecord;
+  onSelect: () => void;
+}) {
   const ts = new Date(clip.recorded_at);
   const when = isNaN(ts.getTime())
     ? "—"
@@ -152,7 +170,15 @@ function RecentClipRow({ clip }: { clip: ClipRecord }) {
       });
 
   return (
-    <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`Review ${clip.filename}`}
+      className="group flex w-full items-center gap-3 rounded-md border border-border bg-card p-3 text-left transition-colors hover:border-foreground/40"
+    >
+      <span className="flex size-9 flex-none items-center justify-center rounded-sm border border-border bg-secondary transition-colors group-hover:bg-foreground group-hover:text-background">
+        <Play className="size-3.5 translate-x-px" fill="currentColor" />
+      </span>
       <div className="min-w-0 flex-1">
         <div className="truncate font-mono text-xs text-foreground">
           {clip.filename}
@@ -170,9 +196,9 @@ function RecentClipRow({ clip }: { clip: ClipRecord }) {
           )}
         </div>
       </div>
-      <Badge variant={clip.processed ? "solid" : "outline"}>
+      <Badge variant={clip.processed ? "solid" : "outline"} className="flex-none">
         {clip.processed ? "Processed" : "Raw"}
       </Badge>
-    </div>
+    </button>
   );
 }

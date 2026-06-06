@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Play, FlagTriangleLeft, FlagTriangleRight } from "lucide-react";
+import { ArrowLeft, FlagTriangleLeft, FlagTriangleRight } from "lucide-react";
 import Timeline from "@/components/Timeline";
 import ClipCard from "@/components/ClipCard";
 import TrickSelector from "@/components/TrickSelector";
+import { Logo } from "@/components/Logo";
 import { useToast } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -136,18 +137,6 @@ export default function ReviewPage() {
     }
   }, []);
 
-  const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      v.play();
-      setPlaying(true);
-    } else {
-      v.pause();
-      setPlaying(false);
-    }
-  };
-
   // ---- Clip marking ------------------------------------------------------
   const markIn = () => {
     setPendingIn(currentTime);
@@ -247,39 +236,26 @@ export default function ReviewPage() {
           Back
         </button>
         <h1 className="label-mono text-foreground">Review &amp; Clip</h1>
-        <div className="w-16" aria-hidden />
+        <Logo showWordmark={false} size={32} className="w-16 justify-end" />
       </header>
 
-      {/* Video player */}
+      {/* Video player — native mobile controls (tap to reveal, auto-hide). */}
       <div className="frame-ticks relative mt-4">
         <div className="relative overflow-hidden rounded-md border border-foreground bg-black">
           {videoUrl && (
             <video
               ref={videoRef}
               src={videoUrl}
+              controls
+              controlsList="nodownload"
               className="aspect-video w-full bg-black"
               playsInline
               onLoadedMetadata={handleLoadedMetadata}
               onPlay={() => setPlaying(true)}
               onPause={() => setPlaying(false)}
               onEnded={() => setPlaying(false)}
-              onClick={togglePlay}
             />
           )}
-          <div className="absolute left-2.5 top-2.5 rounded-sm bg-black/60 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white backdrop-blur">
-            {formatTimePrecise(currentTime)} / {formatTimePrecise(duration)}
-          </div>
-          <button
-            onClick={togglePlay}
-            aria-label={playing ? "Pause" : "Play"}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            {!playing && (
-              <span className="flex size-14 items-center justify-center rounded-full bg-white text-black">
-                <Play className="size-6 translate-x-0.5" fill="currentColor" />
-              </span>
-            )}
-          </button>
         </div>
       </div>
 

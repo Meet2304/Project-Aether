@@ -9,6 +9,7 @@ import { useToast } from "@/components/Toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Logo } from "@/components/Logo";
 import type { Clip, UploadItem } from "@/lib/types";
 import { STORAGE_BUCKET } from "@/lib/types";
 import { slugifyTrick, withTimestamps } from "@/lib/clipUtils";
@@ -225,7 +226,10 @@ export default function UploadPage() {
   return (
     <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-10">
       <header className="border-b border-foreground py-4">
-        <p className="label-mono">{busy ? "Uploading" : "Upload"}</p>
+        <div className="flex items-center justify-between">
+          <p className="label-mono">{busy ? "Uploading" : "Upload"}</p>
+          <Logo showWordmark={false} size={32} />
+        </div>
         <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
           {settled ? (allUploaded ? "Upload complete" : "Upload finished") : "Uploading clips"}
         </h1>
