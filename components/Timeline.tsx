@@ -50,10 +50,13 @@ export default function Timeline({
       const track = trackRef.current;
       if (!track || safeDuration <= 0) return;
       const rect = track.getBoundingClientRect();
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      const ratio = Math.min(
+        1,
+        Math.max(0, (clientX - rect.left) / rect.width),
+      );
       onSeek(ratio * safeDuration);
     },
-    [onSeek, safeDuration]
+    [onSeek, safeDuration],
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -110,7 +113,10 @@ export default function Timeline({
             <span
               key={i}
               className="w-px bg-foreground/10"
-              style={{ height: i % 5 === 0 ? "100%" : "40%", alignSelf: "center" }}
+              style={{
+                height: i % 5 === 0 ? "100%" : "40%",
+                alignSelf: "center",
+              }}
             />
           ))}
         </div>

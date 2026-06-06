@@ -49,7 +49,7 @@ export function dateStamp(d = new Date()): { date: string; time: string } {
 export function buildFilename(
   trick: string,
   index: number,
-  when = new Date()
+  when = new Date(),
 ): string {
   const { date, time } = dateStamp(when);
   return `${slugifyTrick(trick)}_${date}_${time}_${index}.webm`;
@@ -63,7 +63,7 @@ export function buildFilename(
 export function withTimestamps(
   baseFilename: string,
   inPoint: number,
-  outPoint: number
+  outPoint: number,
 ): string {
   const stem = baseFilename.replace(/\.webm$/i, "");
   return `${stem}_IN-${inPoint.toFixed(2)}_OUT-${outPoint.toFixed(2)}.webm`;

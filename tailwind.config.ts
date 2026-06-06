@@ -9,7 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-archivo)", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: [
+          "var(--font-archivo)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       colors: {
@@ -65,6 +70,10 @@ const config: Config = {
           from: { opacity: "0", transform: "translateY(-12px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        barGrow: {
+          from: { transform: "scaleX(0)" },
+          to: { transform: "scaleX(1)" },
+        },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -78,6 +87,7 @@ const config: Config = {
         pulseDot: "pulseDot 1.1s ease-in-out infinite",
         slideUp: "slideUp 0.28s cubic-bezier(0.16,1,0.3,1)",
         toastIn: "toastIn 0.2s ease-out",
+        barGrow: "barGrow 0.6s cubic-bezier(0.16,1,0.3,1) both",
       },
     },
   },

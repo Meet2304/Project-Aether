@@ -21,7 +21,8 @@ function publicUrlFor(clip: ClipRecord): string {
     ? clip.storage_path.slice(prefix.length)
     : clip.storage_path;
   const supabase = createClient();
-  return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+  return supabase.storage.from(STORAGE_BUCKET).getPublicUrl(path).data
+    .publicUrl;
 }
 
 interface ClipPlayerProps {
@@ -47,10 +48,7 @@ export default function ClipPlayer({ clip, onClose }: ClipPlayerProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        hideClose
-        className="gap-0 overflow-hidden p-0 max-w-md"
-      >
+      <DialogContent hideClose className="gap-0 overflow-hidden p-0 max-w-md">
         {/* Player */}
         <div className="relative bg-black">
           {clip && (

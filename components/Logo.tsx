@@ -2,7 +2,7 @@ import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface LogoProps {
-  /** Pixel size of the square mark tile. */
+  /** Pixel size of the square icon tile. */
   size?: number;
   /** Render the "AETHER" wordmark beside the mark. */
   showWordmark?: boolean;
@@ -10,26 +10,20 @@ interface LogoProps {
 }
 
 /**
- * The Aether "Carve" mark in a bordered tile, optionally with the wordmark.
- * Black-on-paper to match the monochrome system. Source: /assets/aether-mark.svg.
+ * The Aether app icon (V2) — a self-contained white "A" mark on a black
+ * rounded tile — optionally with the wordmark. Source: /assets/V2/Icon_v2.png.
  */
 export function Logo({ size = 44, showWordmark = true, className }: LogoProps) {
-  const glyph = Math.round(size * 0.58);
   return (
     <div className={cn("flex items-center gap-3", className)}>
-      <span
-        className="flex flex-none items-center justify-center rounded-md border border-foreground bg-card"
-        style={{ width: size, height: size }}
-      >
-        <Image
-          src="/assets/aether-mark.svg"
-          alt="Aether"
-          width={glyph}
-          height={glyph}
-          priority
-          unoptimized
-        />
-      </span>
+      <Image
+        src="/assets/V2/Icon_v2.png"
+        alt="Aether"
+        width={size}
+        height={size}
+        priority
+        className="flex-none rounded-[22%]"
+      />
       {showWordmark && (
         <span className="text-2xl font-extrabold leading-none tracking-tight">
           AETHER

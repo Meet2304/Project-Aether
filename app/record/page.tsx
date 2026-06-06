@@ -64,7 +64,8 @@ export default function RecordPage() {
         setPermError("Camera API is not available in this browser.");
         return;
       }
-      const stream = await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
+      const stream =
+        await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;

@@ -67,7 +67,8 @@ function ToastBubble({ item }: { item: ToastItem }) {
   }, []);
 
   // Monochrome: the icon glyph carries the meaning, not color.
-  const Icon = item.kind === "success" ? Check : item.kind === "error" ? X : Info;
+  const Icon =
+    item.kind === "success" ? Check : item.kind === "error" ? X : Info;
   const label =
     item.kind === "success" ? "OK" : item.kind === "error" ? "ERR" : "INFO";
 
@@ -75,7 +76,7 @@ function ToastBubble({ item }: { item: ToastItem }) {
     <div
       className={cn(
         "pointer-events-auto flex w-full max-w-sm animate-toastIn items-center gap-3 border border-foreground bg-card px-3.5 py-2.5 text-sm shadow-[3px_3px_0_0_hsl(var(--foreground))] transition-opacity duration-300",
-        leaving ? "opacity-0" : "opacity-100"
+        leaving ? "opacity-0" : "opacity-100",
       )}
       role="status"
       aria-live="polite"

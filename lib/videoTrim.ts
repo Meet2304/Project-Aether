@@ -100,7 +100,7 @@ export async function trimClip(
   sourceUrl: string,
   inPoint: number,
   outPoint: number,
-  sourceBlob: Blob
+  sourceBlob: Blob,
 ): Promise<TrimResult> {
   if (!canCanvasTrim()) {
     return {
@@ -162,7 +162,11 @@ export async function trimClip(
     const drawFrame = () => {
       const elapsed = performance.now() - start;
       ctx.drawImage(video, 0, 0, width, height);
-      if (elapsed >= durationMs || video.currentTime >= outPoint || video.ended) {
+      if (
+        elapsed >= durationMs ||
+        video.currentTime >= outPoint ||
+        video.ended
+      ) {
         cancelAnimationFrame(rafId);
         resolve();
         return;

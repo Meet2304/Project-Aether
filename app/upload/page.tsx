@@ -31,7 +31,9 @@ export default function UploadPage() {
   const [trimSupported, setTrimSupported] = useState(true);
 
   const update = (id: string, patch: Partial<UploadItem>) => {
-    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+    );
   };
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export default function UploadPage() {
         status: "queued",
         progress: 0,
         storagePath: `${STORAGE_BUCKET}/${slugifyTrick(c.trickName)}/${c.filename}`,
-      }))
+      })),
     );
 
     runUploads(clips);
@@ -90,8 +92,8 @@ export default function UploadPage() {
         prev.map((it) =>
           it.id === clip.id && it.status === "uploading" && it.progress < 90
             ? { ...it, progress: it.progress + 7 }
-            : it
-        )
+            : it,
+        ),
       );
     }, 250);
 
@@ -108,7 +110,7 @@ export default function UploadPage() {
           videoUrlRef.current,
           clip.inPoint,
           clip.outPoint,
-          sourceBlob
+          sourceBlob,
         );
         blob = result.blob;
         contentType = result.mimeType;
@@ -179,7 +181,7 @@ export default function UploadPage() {
     setDone(true);
     showToast(
       anyFailed ? "Some clips failed to upload" : "All clips uploaded",
-      anyFailed ? "error" : "success"
+      anyFailed ? "error" : "success",
     );
   }
 
@@ -206,7 +208,7 @@ export default function UploadPage() {
     setBusy(false);
     showToast(
       anyFailed ? "Some clips still failed" : "All clips uploaded",
-      anyFailed ? "error" : "success"
+      anyFailed ? "error" : "success",
     );
   }
 
@@ -231,7 +233,11 @@ export default function UploadPage() {
           <Logo showWordmark={false} size={32} />
         </div>
         <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
-          {settled ? (allUploaded ? "Upload complete" : "Upload finished") : "Uploading clips"}
+          {settled
+            ? allUploaded
+              ? "Upload complete"
+              : "Upload finished"
+            : "Uploading clips"}
         </h1>
         {!trimSupported && (
           <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">

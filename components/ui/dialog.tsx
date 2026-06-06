@@ -19,7 +19,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-foreground/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
+      className,
     )}
     {...props}
   />
@@ -38,7 +38,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2.5rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 gap-4 border border-foreground bg-card p-5 shadow-[6px_6px_0_0_hsl(var(--foreground))] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        className
+        className,
       )}
       {...props}
     >
@@ -66,10 +66,7 @@ const DialogFooter = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("grid grid-cols-2 gap-3 pt-1", className)}
-    {...props}
-  />
+  <div className={cn("grid grid-cols-2 gap-3 pt-1", className)} {...props} />
 );
 DialogFooter.displayName = "DialogFooter";
 

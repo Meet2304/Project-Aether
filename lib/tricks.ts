@@ -35,7 +35,9 @@ export function getCustomTricks(): string[] {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((x) => typeof x === "string")
+      : [];
   } catch {
     return [];
   }
@@ -50,11 +52,11 @@ export function addTrick(name: string): string[] {
   if (!trimmed) return getTricks();
 
   const isDefault = DEFAULT_TRICKS.some(
-    (d) => d.toLowerCase() === trimmed.toLowerCase()
+    (d) => d.toLowerCase() === trimmed.toLowerCase(),
   );
   const custom = getCustomTricks();
   const alreadyCustom = custom.some(
-    (c) => c.toLowerCase() === trimmed.toLowerCase()
+    (c) => c.toLowerCase() === trimmed.toLowerCase(),
   );
 
   if (!isDefault && !alreadyCustom) {

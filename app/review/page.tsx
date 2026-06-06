@@ -113,7 +113,7 @@ export default function ReviewPage() {
         });
       }
     },
-    [duration]
+    [duration],
   );
 
   // Pause playback while scrubbing so the seek preview is clean.
@@ -350,7 +350,12 @@ export default function ReviewPage() {
         ) : (
           <div className="space-y-2">
             {clips.map((clip, i) => (
-              <ClipCard key={clip.id} clip={clip} index={i} onDelete={deleteClip} />
+              <ClipCard
+                key={clip.id}
+                clip={clip}
+                index={i}
+                onDelete={deleteClip}
+              />
             ))}
           </div>
         )}
@@ -361,7 +366,9 @@ export default function ReviewPage() {
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-foreground/40 backdrop-blur-[2px]">
           <div className="w-full max-w-md animate-slideUp rounded-t-xl border-x border-t border-foreground bg-card p-5 pb-8 shadow-[0_-4px_0_0_hsl(var(--foreground))]">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold tracking-tight">Name this clip</h3>
+              <h3 className="text-lg font-bold tracking-tight">
+                Name this clip
+              </h3>
               <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
                 <span className="font-bold text-foreground">
                   {formatTimePrecise(naming.inPoint)}

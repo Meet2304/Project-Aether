@@ -9,6 +9,8 @@ import { formatTimePrecise } from "@/lib/clipUtils";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/Logo";
 import ClipPlayer from "@/components/ClipPlayer";
+import TrickBreakdown from "@/components/TrickBreakdown";
+import { ImportVideoButton } from "@/components/ImportVideo";
 
 export default function HomePage() {
   const [clips, setClips] = useState<ClipRecord[]>([]);
@@ -85,12 +87,27 @@ export default function HomePage() {
         <p className="mt-5 max-w-[15rem] text-center text-sm text-muted-foreground">
           Capture a run, scrub the footage, and clip each trick.
         </p>
+
+        <div className="mt-6 flex w-full max-w-[16rem] items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="label-mono">or</span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
+        <ImportVideoButton className="mt-6 w-full max-w-[16rem]" />
       </div>
+
+      {/* Per-trick counts */}
+      {!loading && !error && clips.length > 0 && (
+        <TrickBreakdown groups={groups} />
+      )}
 
       {/* Recent clips */}
       <section className="flex-1">
         <div className="mb-4 flex items-center justify-between border-b border-border pb-2">
-          <h2 className="label-mono text-foreground">01 — Recent</h2>
+          <h2 className="label-mono text-foreground">
+            {clips.length > 0 ? "02" : "01"} — Recent
+          </h2>
         </div>
 
         {loading && (
@@ -196,7 +213,10 @@ function RecentClipRow({
           )}
         </div>
       </div>
-      <Badge variant={clip.processed ? "solid" : "outline"} className="flex-none">
+      <Badge
+        variant={clip.processed ? "solid" : "outline"}
+        className="flex-none"
+      >
         {clip.processed ? "Processed" : "Raw"}
       </Badge>
     </button>

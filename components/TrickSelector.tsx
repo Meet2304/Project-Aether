@@ -23,7 +23,11 @@ interface TrickSelectorProps {
  * Dropdown of trick names with an inline "add new trick" affordance.
  * New tricks are persisted to localStorage (see lib/tricks).
  */
-export default function TrickSelector({ value, onChange, id }: TrickSelectorProps) {
+export default function TrickSelector({
+  value,
+  onChange,
+  id,
+}: TrickSelectorProps) {
   const [tricks, setTricks] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [newTrick, setNewTrick] = useState("");
