@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { addTrick, getTricks } from "@/lib/tricks";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface TrickSelectorProps {
   value: string;
@@ -38,26 +47,27 @@ export default function TrickSelector({ value, onChange, id }: TrickSelectorProp
 
   return (
     <div className="space-y-2">
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-12 w-full rounded-xl border border-neutral-700 bg-neutral-900 px-3 text-base text-neutral-100 outline-none focus:border-accent"
-      >
-        {tricks.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id}>
+          <SelectValue placeholder="Select a trick" />
+        </SelectTrigger>
+        <SelectContent>
+          {tricks.map((t) => (
+            <SelectItem key={t} value={t}>
+              {t}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
       {!adding ? (
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="h-10 w-full rounded-lg border border-dashed border-neutral-700 text-sm text-neutral-400 transition-colors hover:border-accent hover:text-accent"
+          className="flex h-10 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
         >
-          + Add new trick
+          <Plus className="size-3.5" />
+          Add new trick
         </button>
       ) : (
         <div className="flex gap-2">
@@ -73,15 +83,11 @@ export default function TrickSelector({ value, onChange, id }: TrickSelectorProp
               }
             }}
             placeholder="New trick name"
-            className="h-11 flex-1 rounded-lg border border-neutral-700 bg-neutral-900 px-3 text-base outline-none focus:border-accent"
+            className="h-11 flex-1 rounded-md border border-input bg-card px-3 text-base outline-none focus:border-foreground"
           />
-          <button
-            type="button"
-            onClick={commitNewTrick}
-            className="h-11 rounded-lg bg-accent px-4 text-sm font-semibold text-white"
-          >
+          <Button type="button" onClick={commitNewTrick} size="default">
             Add
-          </button>
+          </Button>
         </div>
       )}
     </div>

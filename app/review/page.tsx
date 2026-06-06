@@ -3,10 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Play, FlagTriangleLeft, FlagTriangleRight } from "lucide-react";
 import Timeline from "@/components/Timeline";
 import ClipCard from "@/components/ClipCard";
 import TrickSelector from "@/components/TrickSelector";
 import { useToast } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { Clip } from "@/lib/types";
 import {
   buildFilename,
@@ -54,7 +64,6 @@ export default function ReviewPage() {
     const v = videoRef.current;
     if (!v) return;
     if (v.duration === Infinity || isNaN(v.duration)) {
-      // Force the browser to compute the real duration by seeking far ahead.
       const onSeeked = () => {
         v.currentTime = 0;
         setDuration(v.duration === Infinity ? 0 : v.duration);
@@ -82,11 +91,49 @@ export default function ReviewPage() {
     };
   }, [playing]);
 
-  const seek = useCallback((t: number) => {
+  // Live scrubbing. Coalesce rapid pointer moves into one seek per frame so the
+  // video keeps up smoothly while the cursor drags.
+  const seekRafRef = useRef<number | null>(null);
+  const pendingSeekRef = useRef<number | null>(null);
+
+  const seek = useCallback(
+    (t: number) => {
+      const max = duration > 0 && isFinite(duration) ? duration : t;
+      const clamped = Math.max(0, Math.min(t, max));
+      setCurrentTime(clamped);
+      pendingSeekRef.current = clamped;
+      if (seekRafRef.current == null) {
+        seekRafRef.current = requestAnimationFrame(() => {
+          seekRafRef.current = null;
+          const v = videoRef.current;
+          if (v && pendingSeekRef.current != null) {
+            v.currentTime = pendingSeekRef.current;
+          }
+        });
+      }
+    },
+    [duration]
+  );
+
+  // Pause playback while scrubbing so the seek preview is clean.
+  const handleScrubStart = useCallback(() => {
     const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = t;
-    setCurrentTime(t);
+    if (v && !v.paused) {
+      v.pause();
+      setPlaying(false);
+    }
+  }, []);
+
+  // On release, apply the final precise seek immediately.
+  const handleScrubEnd = useCallback(() => {
+    if (seekRafRef.current != null) {
+      cancelAnimationFrame(seekRafRef.current);
+      seekRafRef.current = null;
+    }
+    const v = videoRef.current;
+    if (v && pendingSeekRef.current != null) {
+      v.currentTime = pendingSeekRef.current;
+    }
   }, []);
 
   const togglePlay = () => {
@@ -172,17 +219,15 @@ export default function ReviewPage() {
   // ---- Missing video state ------------------------------------------------
   if (missing) {
     return (
-      <main className="screen-enter mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-4 px-6 text-center">
-        <h1 className="text-lg font-semibold">No recording found</h1>
-        <p className="text-sm text-neutral-400">
+      <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
+        <p className="label-mono">Review</p>
+        <h1 className="text-xl font-bold tracking-tight">No recording found</h1>
+        <p className="text-sm text-muted-foreground">
           Looks like there&apos;s no video to review. Record a trick first.
         </p>
-        <Link
-          href="/record"
-          className="flex h-12 w-full max-w-xs items-center justify-center rounded-xl bg-accent font-semibold text-white"
-        >
-          Go to Recorder
-        </Link>
+        <Button asChild size="lg" className="w-full max-w-xs">
+          <Link href="/record">Go to Recorder</Link>
+        </Button>
       </main>
     );
   }
@@ -192,59 +237,53 @@ export default function ReviewPage() {
     : "";
 
   return (
-    <main className="screen-enter mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pb-44">
-      <header className="flex items-center justify-between py-3">
+    <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-4 pb-44">
+      <header className="flex items-center justify-between border-b border-border py-3">
         <button
           onClick={() => setShowDiscard(true)}
-          className="flex h-10 items-center gap-1 rounded-lg px-2 text-sm text-neutral-400"
+          className="flex h-9 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="size-4" />
           Back
         </button>
-        <h1 className="text-sm font-semibold uppercase tracking-wide text-neutral-400">
-          Review &amp; Clip
-        </h1>
+        <h1 className="label-mono text-foreground">Review &amp; Clip</h1>
         <div className="w-16" aria-hidden />
       </header>
 
-      {/* Video player (top half) */}
-      <div className="relative overflow-hidden rounded-2xl bg-black">
-        {videoUrl && (
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="aspect-video w-full bg-black"
-            playsInline
-            onLoadedMetadata={handleLoadedMetadata}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            onClick={togglePlay}
-          />
-        )}
-        {/* Current timestamp overlay */}
-        <div className="absolute left-3 top-3 rounded-md bg-black/60 px-2 py-1 text-xs font-medium tabular-nums text-white backdrop-blur">
-          {formatTimePrecise(currentTime)} / {formatTimePrecise(duration)}
-        </div>
-        {/* Play / pause */}
-        <button
-          onClick={togglePlay}
-          aria-label={playing ? "Pause" : "Play"}
-          className="absolute inset-0 flex items-center justify-center"
-        >
-          {!playing && (
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </span>
+      {/* Video player */}
+      <div className="frame-ticks relative mt-4">
+        <div className="relative overflow-hidden rounded-md border border-foreground bg-black">
+          {videoUrl && (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              className="aspect-video w-full bg-black"
+              playsInline
+              onLoadedMetadata={handleLoadedMetadata}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              onClick={togglePlay}
+            />
           )}
-        </button>
+          <div className="absolute left-2.5 top-2.5 rounded-sm bg-black/60 px-2 py-1 font-mono text-[11px] font-medium tabular-nums text-white backdrop-blur">
+            {formatTimePrecise(currentTime)} / {formatTimePrecise(duration)}
+          </div>
+          <button
+            onClick={togglePlay}
+            aria-label={playing ? "Pause" : "Play"}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            {!playing && (
+              <span className="flex size-14 items-center justify-center rounded-full bg-white text-black">
+                <Play className="size-6 translate-x-0.5" fill="currentColor" />
+              </span>
+            )}
+          </button>
+        </div>
       </div>
 
-      {/* Timeline (middle) */}
+      {/* Timeline */}
       <div className="py-4">
         <Timeline
           duration={duration}
@@ -252,44 +291,84 @@ export default function ReviewPage() {
           clips={clips}
           pendingIn={pendingIn}
           onSeek={seek}
+          onScrubStart={handleScrubStart}
+          onScrubEnd={handleScrubEnd}
         />
       </div>
 
-      {/* Mark controls */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          onClick={markIn}
-          className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-marker-in/60 bg-marker-in/10 font-semibold text-marker-in active:scale-[0.98]"
+      {/* IN / OUT readout — the OUT cell live-previews the playhead once IN is
+          set, so you can scrub to the exact frame before capturing. */}
+      <div className="grid grid-cols-2 overflow-hidden rounded-md border border-border">
+        <div
+          className={`border-r border-border p-3 transition-colors ${
+            pendingIn === null ? "bg-secondary" : "bg-card"
+          }`}
         >
-          <span className="h-2.5 w-2.5 rounded-full bg-marker-in" />
-          Mark IN
-        </button>
-        <button
-          onClick={markOut}
-          disabled={pendingIn === null}
-          className="flex h-12 items-center justify-center gap-2 rounded-xl border-2 border-marker-out/60 bg-marker-out/10 font-semibold text-marker-out active:scale-[0.98] disabled:opacity-40"
+          <div className="flex items-center justify-between">
+            <span className="label-mono text-foreground">In</span>
+            {pendingIn === null && (
+              <span className="size-1.5 animate-pulseDot rounded-full bg-foreground" />
+            )}
+          </div>
+          <div className="mt-1 font-mono text-xl font-bold tabular-nums">
+            {pendingIn !== null ? formatTimePrecise(pendingIn) : "––:––.–"}
+          </div>
+        </div>
+        <div
+          className={`p-3 transition-colors ${
+            pendingIn !== null ? "bg-secondary" : "bg-card"
+          }`}
         >
-          <span className="h-2.5 w-2.5 rounded-sm bg-marker-out" />
-          Mark OUT
-        </button>
+          <div className="flex items-center justify-between">
+            <span className="label-mono text-foreground">Out</span>
+            {pendingIn !== null && (
+              <span className="font-mono text-[10px] font-bold tabular-nums text-muted-foreground">
+                {Math.max(0, currentTime - pendingIn).toFixed(1)}s
+              </span>
+            )}
+          </div>
+          <div className="mt-1 font-mono text-xl font-bold tabular-nums">
+            {pendingIn !== null ? formatTimePrecise(currentTime) : "––:––.–"}
+          </div>
+        </div>
       </div>
 
-      {pendingIn !== null && !naming && (
-        <p className="mt-2 text-center text-xs text-neutral-500">
-          IN set at{" "}
-          <span className="text-marker-in">{formatTimePrecise(pendingIn)}</span>
-          . Scrub forward and tap{" "}
-          <span className="text-marker-out">Mark OUT</span>.
-        </p>
-      )}
+      {/* Set buttons — the active step is filled, the other is a hairline. */}
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Button
+          size="lg"
+          variant={pendingIn === null ? "default" : "outline"}
+          onClick={markIn}
+        >
+          <FlagTriangleLeft className="size-4" />
+          {pendingIn === null ? "Set IN" : "Reset IN"}
+        </Button>
+        <Button
+          size="lg"
+          variant={pendingIn !== null ? "default" : "outline"}
+          onClick={markOut}
+          disabled={pendingIn === null}
+        >
+          <FlagTriangleRight className="size-4" />
+          Set OUT
+        </Button>
+      </div>
+
+      <p className="mt-2.5 text-center font-mono text-[11px] text-muted-foreground">
+        {pendingIn === null
+          ? "Scrub the timeline, then set the IN point."
+          : "Scrub to the end of the trick, then set OUT."}
+      </p>
 
       {/* Clip list */}
-      <section className="mt-5">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Clips ({clips.length})
-        </h2>
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between border-b border-border pb-2">
+          <h2 className="label-mono text-foreground">
+            02 — Clips ({String(clips.length).padStart(2, "0")})
+          </h2>
+        </div>
         {clips.length === 0 ? (
-          <p className="rounded-xl border border-neutral-800 bg-surface p-4 text-center text-sm text-neutral-500">
+          <p className="rounded-md border border-dashed border-border bg-card p-5 text-center text-sm text-muted-foreground">
             No clips marked yet. Use Mark IN / Mark OUT to create one.
           </p>
         ) : (
@@ -301,104 +380,89 @@ export default function ReviewPage() {
         )}
       </section>
 
-      {/* Naming panel (inline, after Mark OUT) */}
+      {/* Naming bottom sheet (after Mark OUT) */}
       {naming && (
-        <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md animate-slideUp rounded-t-2xl border-t border-neutral-800 bg-surface p-5 pb-8">
+        <div className="fixed inset-0 z-30 flex items-end justify-center bg-foreground/40 backdrop-blur-[2px]">
+          <div className="w-full max-w-md animate-slideUp rounded-t-xl border-x border-t border-foreground bg-card p-5 pb-8 shadow-[0_-4px_0_0_hsl(var(--foreground))]">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold">Name this clip</h3>
-              <span className="text-xs tabular-nums text-neutral-400">
-                <span className="text-marker-in">
+              <h3 className="text-lg font-bold tracking-tight">Name this clip</h3>
+              <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                <span className="font-bold text-foreground">
                   {formatTimePrecise(naming.inPoint)}
                 </span>{" "}
                 →{" "}
-                <span className="text-marker-out">
+                <span className="font-bold text-foreground">
                   {formatTimePrecise(naming.outPoint)}
                 </span>{" "}
                 ({(naming.outPoint - naming.inPoint).toFixed(1)}s)
               </span>
             </div>
 
-            <label className="mb-1 block text-xs font-medium text-neutral-400">
-              Trick
-            </label>
+            <label className="label-mono mb-1.5 block">Trick</label>
             <TrickSelector
               value={naming.trick}
               onChange={(trick) => setNaming((n) => (n ? { ...n, trick } : n))}
             />
 
-            <div className="mt-4 rounded-lg border border-neutral-800 bg-neutral-900 p-3">
-              <div className="text-[10px] uppercase tracking-wide text-neutral-500">
-                Filename preview
-              </div>
-              <div className="mt-1 break-all font-mono text-xs text-accent">
+            <div className="mt-4 rounded-md border border-border bg-secondary p-3">
+              <div className="label-mono">Filename preview</div>
+              <div className="mt-1 break-all font-mono text-xs text-foreground">
                 {namingFilename}
               </div>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-3">
-              <button
-                onClick={discardNaming}
-                className="h-12 rounded-xl border border-neutral-700 font-semibold text-neutral-300 active:scale-[0.98]"
-              >
+              <Button variant="outline" size="lg" onClick={discardNaming}>
                 Discard Clip
-              </button>
-              <button
-                onClick={confirmClip}
-                className="h-12 rounded-xl bg-accent font-semibold text-white active:scale-[0.98]"
-              >
+              </Button>
+              <Button size="lg" onClick={confirmClip}>
                 Confirm Clip
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Bottom action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-800 bg-background/95 px-4 pb-6 pt-3 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-foreground bg-background/95 px-4 pb-6 pt-3 backdrop-blur">
         <div className="mx-auto flex w-full max-w-md gap-3">
-          <button
+          <Button
+            variant="outline"
+            size="lg"
+            className="flex-1"
             onClick={() => setShowDiscard(true)}
-            className="h-12 flex-1 rounded-xl border border-neutral-700 font-semibold text-neutral-300 active:scale-[0.98]"
           >
-            Discard Video
-          </button>
-          <button
+            Discard
+          </Button>
+          <Button
+            size="lg"
+            className="flex-[1.5]"
             onClick={uploadAll}
             disabled={clips.length === 0}
-            className="h-12 flex-[1.4] rounded-xl bg-accent font-semibold text-white active:scale-[0.98] disabled:opacity-40"
           >
-            Upload All Clips{clips.length > 0 ? ` (${clips.length})` : ""}
-          </button>
+            Upload{clips.length > 0 ? ` · ${clips.length}` : ""}
+          </Button>
         </div>
       </div>
 
       {/* Discard confirmation dialog */}
-      {showDiscard && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-6">
-          <div className="w-full max-w-sm animate-slideUp rounded-2xl border border-neutral-800 bg-surface p-5">
-            <h3 className="text-base font-semibold">Discard this video?</h3>
-            <p className="mt-2 text-sm text-neutral-400">
+      <Dialog open={showDiscard} onOpenChange={setShowDiscard}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard this video?</DialogTitle>
+            <DialogDescription>
               Your recording and all {clips.length} marked clip
               {clips.length === 1 ? "" : "s"} will be lost.
-            </p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setShowDiscard(false)}
-                className="h-12 rounded-xl border border-neutral-700 font-semibold text-neutral-300"
-              >
-                Keep Editing
-              </button>
-              <button
-                onClick={discardVideo}
-                className="h-12 rounded-xl bg-red-500 font-semibold text-white"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDiscard(false)}>
+              Keep Editing
+            </Button>
+            <Button onClick={discardVideo}>Discard</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

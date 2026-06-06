@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Check, AlertTriangle, RotateCw } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import { useToast } from "@/components/Toast";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import type { Clip, UploadItem } from "@/lib/types";
 import { STORAGE_BUCKET } from "@/lib/types";
 import { slugifyTrick, withTimestamps } from "@/lib/clipUtils";
@@ -15,8 +19,14 @@ export default function UploadPage() {
   const { showToast } = useToast();
   const startedRef = useRef(false);
 
+  // Source recording + capability, cached so retries can reuse them.
+  const videoUrlRef = useRef<string>("");
+  const sourceBlobRef = useRef<Blob | null>(null);
+  const canTrimRef = useRef<boolean>(true);
+
   const [items, setItems] = useState<UploadItem[]>([]);
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [trimSupported, setTrimSupported] = useState(true);
 
   const update = (id: string, patch: Partial<UploadItem>) => {
@@ -35,6 +45,9 @@ export default function UploadPage() {
     }
     const clips: Clip[] = JSON.parse(raw);
     const canTrim = canCanvasTrim();
+
+    videoUrlRef.current = videoUrl;
+    canTrimRef.current = canTrim;
     setTrimSupported(canTrim);
 
     setItems(
@@ -46,114 +59,154 @@ export default function UploadPage() {
       }))
     );
 
-    runUploads(clips, videoUrl, canTrim);
+    runUploads(clips);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runUploads(clips: Clip[], videoUrl: string, canTrim: boolean) {
-    const supabase = createClient();
-
-    // Fetch the source recording once so we can trim segments from it.
-    let sourceBlob: Blob | null = null;
+  /** Fetch the source recording once and cache it for trims + retries. */
+  async function ensureSourceBlob(): Promise<Blob | null> {
+    if (sourceBlobRef.current) return sourceBlobRef.current;
     try {
-      sourceBlob = await (await fetch(videoUrl)).blob();
+      const blob = await (await fetch(videoUrlRef.current)).blob();
+      sourceBlobRef.current = blob;
+      return blob;
     } catch {
-      sourceBlob = null;
+      return null;
     }
+  }
 
-    let anyFailed = false;
+  /**
+   * Upload a single clip: trim the segment (when supported), push it to
+   * storage, and write the metadata row. Returns true on success. Used for
+   * both the initial pass and retries.
+   */
+  async function uploadOne(clip: Clip): Promise<boolean> {
+    update(clip.id, { status: "uploading", progress: 5, error: undefined });
 
-    for (const clip of clips) {
-      update(clip.id, { status: "uploading", progress: 5 });
+    // Simulated progress (Supabase storage upload has no progress events).
+    const ticker = window.setInterval(() => {
+      setItems((prev) =>
+        prev.map((it) =>
+          it.id === clip.id && it.status === "uploading" && it.progress < 90
+            ? { ...it, progress: it.progress + 7 }
+            : it
+        )
+      );
+    }, 250);
 
-      // Simulated progress (Supabase storage upload has no progress events).
-      const ticker = window.setInterval(() => {
-        setItems((prev) =>
-          prev.map((it) =>
-            it.id === clip.id && it.status === "uploading" && it.progress < 90
-              ? { ...it, progress: it.progress + 7 }
-              : it
-          )
+    try {
+      const supabase = createClient();
+      const sourceBlob = await ensureSourceBlob();
+
+      let blob = sourceBlob;
+      let filename = clip.filename;
+      let contentType = sourceBlob?.type || "video/webm";
+
+      if (sourceBlob && canTrimRef.current) {
+        const result = await trimClip(
+          videoUrlRef.current,
+          clip.inPoint,
+          clip.outPoint,
+          sourceBlob
         );
-      }, 250);
-
-      try {
-        let blob = sourceBlob;
-        let filename = clip.filename;
-        let contentType = sourceBlob?.type || "video/webm";
-
-        if (sourceBlob && canTrim) {
-          const result = await trimClip(
-            videoUrl,
-            clip.inPoint,
-            clip.outPoint,
-            sourceBlob
-          );
-          blob = result.blob;
-          contentType = result.mimeType;
-          if (!result.trimmed) {
-            // Trimming silently failed → fall back to metadata in filename.
-            filename = withTimestamps(clip.filename, clip.inPoint, clip.outPoint);
-          } else if (result.ext === "mp4") {
-            filename = clip.filename.replace(/\.webm$/i, ".mp4");
-          }
-        } else if (sourceBlob) {
-          // No trimming support → upload full video with IN/OUT in filename.
+        blob = result.blob;
+        contentType = result.mimeType;
+        if (!result.trimmed) {
           filename = withTimestamps(clip.filename, clip.inPoint, clip.outPoint);
+        } else if (result.ext === "mp4") {
+          filename = clip.filename.replace(/\.webm$/i, ".mp4");
         }
-
-        if (!blob) throw new Error("No video data available to upload");
-
-        const slug = slugifyTrick(clip.trickName);
-        const path = `${slug}/${filename}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(path, blob, {
-            contentType,
-            upsert: true,
-            cacheControl: "3600",
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Write the metadata row.
-        const { error: dbError } = await supabase.from("clips").insert({
-          trick_name: clip.trickName,
-          filename,
-          storage_path: `${STORAGE_BUCKET}/${path}`,
-          duration_seconds: Number((clip.outPoint - clip.inPoint).toFixed(3)),
-          in_point: Number(clip.inPoint.toFixed(3)),
-          out_point: Number(clip.outPoint.toFixed(3)),
-          processed: false,
-        });
-
-        if (dbError) throw dbError;
-
-        window.clearInterval(ticker);
-        update(clip.id, {
-          status: "done",
-          progress: 100,
-          filename,
-          storagePath: `${STORAGE_BUCKET}/${path}`,
-        });
-      } catch (e) {
-        window.clearInterval(ticker);
-        anyFailed = true;
-        update(clip.id, {
-          status: "failed",
-          progress: 100,
-          error: e instanceof Error ? e.message : "Upload failed",
-        });
+      } else if (sourceBlob) {
+        filename = withTimestamps(clip.filename, clip.inPoint, clip.outPoint);
       }
-    }
 
-    setDone(true);
-    if (anyFailed) {
-      showToast("Some clips failed to upload", "error");
-    } else {
-      showToast("All clips uploaded", "success");
+      if (!blob) throw new Error("No video data available to upload");
+
+      const slug = slugifyTrick(clip.trickName);
+      const path = `${slug}/${filename}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(path, blob, {
+          contentType,
+          upsert: true,
+          cacheControl: "3600",
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase.from("clips").insert({
+        trick_name: clip.trickName,
+        filename,
+        storage_path: `${STORAGE_BUCKET}/${path}`,
+        duration_seconds: Number((clip.outPoint - clip.inPoint).toFixed(3)),
+        in_point: Number(clip.inPoint.toFixed(3)),
+        out_point: Number(clip.outPoint.toFixed(3)),
+        processed: false,
+      });
+
+      if (dbError) throw dbError;
+
+      window.clearInterval(ticker);
+      update(clip.id, {
+        status: "done",
+        progress: 100,
+        filename,
+        storagePath: `${STORAGE_BUCKET}/${path}`,
+      });
+      return true;
+    } catch (e) {
+      window.clearInterval(ticker);
+      update(clip.id, {
+        status: "failed",
+        progress: 0,
+        error: e instanceof Error ? e.message : "Upload failed",
+      });
+      return false;
     }
+  }
+
+  /** Initial sequential pass over every queued clip. */
+  async function runUploads(clips: Clip[]) {
+    setBusy(true);
+    let anyFailed = false;
+    for (const clip of clips) {
+      const ok = await uploadOne(clip);
+      if (!ok) anyFailed = true;
+    }
+    setBusy(false);
+    setDone(true);
+    showToast(
+      anyFailed ? "Some clips failed to upload" : "All clips uploaded",
+      anyFailed ? "error" : "success"
+    );
+  }
+
+  /** Retry a single failed clip. */
+  async function retryOne(clip: Clip) {
+    if (busy) return;
+    setBusy(true);
+    const ok = await uploadOne(clip);
+    setBusy(false);
+    showToast(ok ? "Clip uploaded" : "Retry failed", ok ? "success" : "error");
+  }
+
+  /** Retry every clip currently in the failed state, in order. */
+  async function retryAllFailed() {
+    if (busy) return;
+    const failed = items.filter((i) => i.status === "failed");
+    if (failed.length === 0) return;
+    setBusy(true);
+    let anyFailed = false;
+    for (const it of failed) {
+      const ok = await uploadOne(it);
+      if (!ok) anyFailed = true;
+    }
+    setBusy(false);
+    showToast(
+      anyFailed ? "Some clips still failed" : "All clips uploaded",
+      anyFailed ? "error" : "success"
+    );
   }
 
   const recordAnother = () => {
@@ -166,82 +219,99 @@ export default function UploadPage() {
 
   const doneCount = items.filter((i) => i.status === "done").length;
   const failedCount = items.filter((i) => i.status === "failed").length;
-  const allDone = done && items.length > 0;
+  const settled = done && !busy && items.length > 0;
+  const allUploaded = settled && failedCount === 0;
 
   return (
-    <main className="screen-enter mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-10">
-      <header className="py-5 text-center">
-        <h1 className="text-lg font-semibold">
-          {allDone ? "Upload complete" : "Uploading clips"}
+    <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-10">
+      <header className="border-b border-foreground py-4">
+        <p className="label-mono">{busy ? "Uploading" : "Upload"}</p>
+        <h1 className="mt-1 text-2xl font-extrabold tracking-tight">
+          {settled ? (allUploaded ? "Upload complete" : "Upload finished") : "Uploading clips"}
         </h1>
         {!trimSupported && (
-          <p className="mx-auto mt-2 max-w-xs text-xs text-amber-400/80">
-            Client-side trimming isn&apos;t supported on this browser — full
-            videos are uploaded with IN/OUT points in the filename for
-            server-side trimming.
+          <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            Client-side trimming isn&apos;t supported here — full videos upload
+            with IN/OUT points in the filename for server-side trimming.
           </p>
         )}
         {trimSupported && hasWebCodecs() && (
-          <p className="mt-1 text-[11px] text-neutral-600">
-            Trimming segments client-side
-          </p>
+          <p className="mt-1.5 label-mono">Trimming segments client-side</p>
         )}
       </header>
 
-      {/* Success summary */}
-      {allDone && (
-        <div
-          className={`mb-5 rounded-2xl border p-5 text-center ${
-            failedCount === 0
-              ? "border-emerald-500/30 bg-emerald-500/5"
-              : "border-amber-500/30 bg-amber-500/5"
-          }`}
-        >
-          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400">
-            {failedCount === 0 ? (
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-            ) : (
-              <span className="text-2xl">!</span>
-            )}
+      {/* Summary */}
+      {settled && (
+        <div className="mt-5 rounded-md border border-foreground bg-card p-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 flex-none items-center justify-center rounded-md border border-foreground">
+              {allUploaded ? (
+                <Check className="size-5" strokeWidth={2.5} />
+              ) : (
+                <AlertTriangle className="size-5" strokeWidth={2} />
+              )}
+            </span>
+            <div className="flex-1">
+              <p className="font-mono text-2xl font-bold tabular-nums leading-none">
+                {String(doneCount).padStart(2, "0")}
+                <span className="text-muted-foreground">
+                  /{String(items.length).padStart(2, "0")}
+                </span>
+              </p>
+              <p className="label-mono mt-1.5">
+                Uploaded{failedCount > 0 ? ` · ${failedCount} failed` : ""}
+              </p>
+            </div>
           </div>
-          <p className="text-sm text-neutral-200">
-            {doneCount} of {items.length} clip{items.length === 1 ? "" : "s"}{" "}
-            uploaded
-            {failedCount > 0 ? `, ${failedCount} failed` : ""}.
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Run the skeleton post-processor to add pose overlays.
-          </p>
+
+          {failedCount > 0 && (
+            <Button
+              onClick={retryAllFailed}
+              variant="outline"
+              size="default"
+              className="mt-4 w-full"
+              disabled={busy}
+            >
+              <RotateCw className="size-4" />
+              Retry {failedCount} failed
+            </Button>
+          )}
+
+          {allUploaded && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Run the skeleton post-processor to add pose overlays.
+            </p>
+          )}
         </div>
       )}
 
       {/* Progress list */}
-      <div className="flex-1 space-y-3">
+      <div className="mt-5 flex-1 space-y-3">
         {items.map((it) => (
-          <UploadRow key={it.id} item={it} />
+          <UploadRow
+            key={it.id}
+            item={it}
+            busy={busy}
+            onRetry={() => retryOne(it)}
+          />
         ))}
       </div>
 
-      {/* Footer actions */}
+      {/* Footer */}
       <div className="mt-6">
-        {allDone ? (
-          <button
-            onClick={recordAnother}
-            className="h-12 w-full rounded-xl bg-accent font-semibold text-white active:scale-[0.98]"
-          >
+        {settled ? (
+          <Button onClick={recordAnother} size="lg" className="w-full">
             Record Another
-          </button>
+          </Button>
         ) : (
-          <div className="flex items-center justify-center gap-2 text-sm text-neutral-500">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-700 border-t-accent" />
-            Please keep this screen open…
+          <div className="flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="size-3.5 animate-spin rounded-full border-2 border-border border-t-foreground" />
+            Keep this screen open…
           </div>
         )}
         <Link
           href="/"
-          className="mt-3 block text-center text-xs text-neutral-600"
+          className="mt-3 block text-center font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-foreground"
         >
           Back to Home
         </Link>
@@ -250,50 +320,75 @@ export default function UploadPage() {
   );
 }
 
-function UploadRow({ item }: { item: UploadItem }) {
+function UploadRow({
+  item,
+  busy,
+  onRetry,
+}: {
+  item: UploadItem;
+  busy: boolean;
+  onRetry: () => void;
+}) {
   const slug = slugifyTrick(item.trickName);
+
   const statusLabel: Record<UploadItem["status"], string> = {
     queued: "Queued",
     uploading: "Uploading",
     done: "Done",
     failed: "Failed",
   };
-  const statusColor: Record<UploadItem["status"], string> = {
-    queued: "text-neutral-500",
-    uploading: "text-accent",
-    done: "text-emerald-400",
-    failed: "text-red-400",
+  const badgeVariant: Record<
+    UploadItem["status"],
+    "solid" | "outline" | "muted"
+  > = {
+    queued: "muted",
+    uploading: "outline",
+    done: "solid",
+    failed: "outline",
   };
-  const barColor =
-    item.status === "failed"
-      ? "bg-red-500"
-      : item.status === "done"
-        ? "bg-emerald-500"
-        : "bg-accent";
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-surface p-3">
+    <div className="rounded-md border border-border bg-card p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate font-mono text-xs text-neutral-200">
+          <div className="truncate font-mono text-xs text-foreground">
             {item.filename}
           </div>
-          <div className="mt-0.5 text-[11px] text-neutral-500">
+          <div className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {STORAGE_BUCKET}/{slug}/
           </div>
         </div>
-        <span className={`flex-none text-xs font-semibold ${statusColor[item.status]}`}>
+        <Badge variant={badgeVariant[item.status]} className="flex-none">
+          {item.status === "failed" && <AlertTriangle className="size-3" />}
           {statusLabel[item.status]}
-        </span>
+        </Badge>
       </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-neutral-800">
-        <div
-          className={`h-full rounded-full transition-all duration-300 ${barColor}`}
-          style={{ width: `${item.progress}%` }}
-        />
+
+      {/* Progress: a clean bar while in flight/done, a hatched bar on failure. */}
+      <div className="mt-2.5">
+        {item.status === "failed" ? (
+          <div className="hatch h-1 w-full rounded-full opacity-40" />
+        ) : (
+          <Progress value={item.progress} />
+        )}
       </div>
-      {item.error && (
-        <p className="mt-1.5 text-[11px] text-red-400/80">{item.error}</p>
+
+      {item.status === "failed" && (
+        <div className="mt-2.5 flex items-center justify-between gap-3">
+          <p className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+            {item.error || "Upload failed"}
+          </p>
+          <Button
+            onClick={onRetry}
+            variant="subtle"
+            size="sm"
+            disabled={busy}
+            className="flex-none"
+          >
+            <RotateCw className="size-3.5" />
+            Retry
+          </Button>
+        </div>
       )}
     </div>
   );

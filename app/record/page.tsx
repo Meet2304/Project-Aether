@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, VideoOff } from "lucide-react";
 import { formatTime } from "@/lib/clipUtils";
+import { Button } from "@/components/ui/button";
 
 type PermissionState = "prompt" | "granted" | "denied" | "error";
 
@@ -146,37 +148,28 @@ export default function RecordPage() {
 
   if (perm === "denied" || perm === "error") {
     return (
-      <main className="screen-enter mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-5 px-6 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10 text-red-400">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M1 1l22 22" />
-            <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m4-2h4l2 2h2a2 2 0 0 1 2 2v9.34" />
-            <path d="M9.5 9.5a3 3 0 0 0 4 4" />
-          </svg>
+      <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
+        <div className="flex size-16 items-center justify-center rounded-full border border-foreground">
+          <VideoOff className="size-7" strokeWidth={1.75} />
         </div>
         <div>
-          <h1 className="text-lg font-semibold">
-            {perm === "denied" ? "Camera access blocked" : "Camera unavailable"}
+          <p className="label-mono mb-2">Camera</p>
+          <h1 className="text-xl font-bold tracking-tight">
+            {perm === "denied" ? "Access blocked" : "Camera unavailable"}
           </h1>
-          <p className="mt-2 text-sm text-neutral-400">
+          <p className="mt-2 text-sm text-muted-foreground">
             {perm === "denied"
               ? "To record tricks, allow camera access for this site in your browser settings, then try again."
               : permError}
           </p>
         </div>
         <div className="flex w-full flex-col gap-3">
-          <button
-            onClick={startCamera}
-            className="h-12 w-full rounded-xl bg-accent text-base font-semibold text-white active:scale-[0.98]"
-          >
+          <Button onClick={startCamera} size="lg" className="w-full">
             Try Again
-          </button>
-          <Link
-            href="/"
-            className="flex h-12 w-full items-center justify-center rounded-xl border border-neutral-700 text-base font-medium text-neutral-300"
-          >
-            Back to Home
-          </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="w-full">
+            <Link href="/">Back to Home</Link>
+          </Button>
         </div>
       </main>
     );
@@ -194,34 +187,44 @@ export default function RecordPage() {
         playsInline
       />
 
+      {/* Viewfinder corner brackets */}
+      <div className="pointer-events-none absolute inset-5">
+        <span className="absolute left-0 top-0 size-5 border-l-2 border-t-2 border-white/70" />
+        <span className="absolute right-0 top-0 size-5 border-r-2 border-t-2 border-white/70" />
+        <span className="absolute bottom-0 left-0 size-5 border-b-2 border-l-2 border-white/70" />
+        <span className="absolute bottom-0 right-0 size-5 border-b-2 border-r-2 border-white/70" />
+      </div>
+
       {/* Top bar */}
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-4">
+      <div className="absolute inset-x-0 top-0 flex items-center justify-between px-5 pt-5">
         {!recording ? (
           <Link
             href="/"
             aria-label="Back to home"
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur"
+            className="flex size-11 items-center justify-center rounded-full border border-white/40 bg-black/40 text-white backdrop-blur"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+            <ArrowLeft className="size-5" />
           </Link>
         ) : (
-          <div className="flex items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur">
-            <span className="h-3 w-3 animate-pulseDot rounded-full bg-red-500" />
-            <span className="text-sm font-semibold tabular-nums text-white">
+          <div className="flex items-center gap-2 rounded-full border border-white/40 bg-black/50 px-3 py-1.5 backdrop-blur">
+            <span className="size-2.5 animate-pulseDot rounded-full bg-white" />
+            <span className="font-mono text-sm font-bold tabular-nums text-white">
               {formatTime(elapsed)}
             </span>
           </div>
         )}
-        <div className="h-11 w-11" aria-hidden />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/70">
+          {recording ? "● Rec" : "Standby"}
+        </span>
       </div>
 
       {perm === "prompt" && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-center">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 text-center">
           <div className="px-6">
-            <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-neutral-600 border-t-accent" />
-            <p className="text-sm text-neutral-300">Requesting camera…</p>
+            <div className="mx-auto mb-3 size-9 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/80">
+              Requesting camera
+            </p>
           </div>
         </div>
       )}
@@ -232,17 +235,17 @@ export default function RecordPage() {
           onClick={recording ? stopRecording : startRecording}
           disabled={perm !== "granted"}
           aria-label={recording ? "Stop recording" : "Start recording"}
-          className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-white/80 bg-transparent transition-transform active:scale-95 disabled:opacity-40"
+          className="flex size-20 items-center justify-center rounded-full border-4 border-white bg-transparent transition-transform active:scale-95 disabled:opacity-40"
         >
           <span
             className={
               recording
-                ? "h-7 w-7 rounded-md bg-red-500 transition-all"
-                : "h-16 w-16 rounded-full bg-red-500 transition-all"
+                ? "size-7 rounded-sm bg-white transition-all"
+                : "size-16 rounded-full bg-white transition-all"
             }
           />
         </button>
-        <p className="mt-3 text-xs text-white/70">
+        <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/70">
           {recording ? "Tap to stop" : "Tap to record"}
         </p>
       </div>

@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Video } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 import type { ClipRecord } from "@/lib/types";
 import { formatTimePrecise } from "@/lib/clipUtils";
+import { Badge } from "@/components/ui/badge";
 
 export default function HomePage() {
   const [clips, setClips] = useState<ClipRecord[]>([]);
@@ -28,7 +30,8 @@ export default function HomePage() {
           setClips((data as ClipRecord[]) ?? []);
         }
       } catch (e) {
-        if (active) setError(e instanceof Error ? e.message : "Failed to load clips");
+        if (active)
+          setError(e instanceof Error ? e.message : "Failed to load clips");
       } finally {
         if (active) setLoading(false);
       }
@@ -45,79 +48,84 @@ export default function HomePage() {
   }, {});
 
   return (
-    <main className="screen-enter mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-8">
-      <header className="pt-8 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">Project Aether</h1>
-        <p className="mt-1 text-sm text-neutral-500">Trick Recorder</p>
+    <main className="screen-enter relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col px-5 pb-10">
+      {/* Masthead */}
+      <header className="flex items-center justify-between border-b border-foreground py-4">
+        <div>
+          <h1 className="text-2xl font-extrabold leading-none tracking-tight">
+            AETHER
+          </h1>
+          <p className="label-mono mt-1">Trick Recorder</p>
+        </div>
+        <span className="label-mono text-foreground">
+          {String(clips.length).padStart(2, "0")}&nbsp;clips
+        </span>
       </header>
 
-      {/* Record button */}
-      <div className="flex flex-col items-center py-8">
-        <Link
-          href="/record"
-          aria-label="Record a new trick"
-          className="group flex h-44 w-44 flex-col items-center justify-center rounded-full bg-accent text-white shadow-[0_0_60px_-10px_rgba(59,130,246,0.7)] transition-transform active:scale-95"
-        >
-          <svg
-            width="44"
-            height="44"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {/* Record action — framed like a viewfinder */}
+      <div className="flex flex-col items-center py-10">
+        <div className="frame-ticks relative p-4">
+          <Link
+            href="/record"
+            aria-label="Record a new trick"
+            className="group flex size-40 flex-col items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform active:scale-95"
           >
-            <path d="M23 7l-7 5 7 5V7z" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-          </svg>
-          <span className="mt-2 text-lg font-semibold">Record</span>
-        </Link>
+            <Video className="size-9" strokeWidth={1.75} />
+            <span className="label-mono mt-2 text-primary-foreground">
+              ● Record
+            </span>
+          </Link>
+        </div>
+        <p className="mt-5 max-w-[15rem] text-center text-sm text-muted-foreground">
+          Capture a run, scrub the footage, and clip each trick.
+        </p>
       </div>
 
       {/* Recent clips */}
       <section className="flex-1">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-500">
-          Recent Clips
-        </h2>
+        <div className="mb-4 flex items-center justify-between border-b border-border pb-2">
+          <h2 className="label-mono text-foreground">01 — Recent</h2>
+        </div>
 
         {loading && (
           <div className="space-y-2">
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                className="h-16 animate-pulse rounded-xl border border-neutral-800 bg-surface"
+                className="h-16 animate-pulse rounded-md border border-border bg-secondary"
               />
             ))}
           </div>
         )}
 
         {!loading && error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
-            Couldn&apos;t load clips: {error}
-            <p className="mt-1 text-xs text-red-300/70">
-              Make sure the <code>clips</code> table and{" "}
-              <code>skateboard-data</code> bucket exist in Supabase.
+          <div className="rounded-md border border-foreground bg-card p-4 text-sm">
+            <p className="label-mono mb-1.5 text-foreground">Error</p>
+            <p className="text-foreground">Couldn&apos;t load clips: {error}</p>
+            <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+              Make sure the clips table and skateboard-data bucket exist in
+              Supabase.
             </p>
           </div>
         )}
 
         {!loading && !error && clips.length === 0 && (
-          <div className="rounded-xl border border-neutral-800 bg-surface p-6 text-center text-sm text-neutral-500">
+          <div className="rounded-md border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
             No clips yet. Tap{" "}
-            <span className="font-semibold text-accent">Record</span> to capture
-            your first trick.
+            <span className="font-semibold text-foreground">Record</span> to
+            capture your first trick.
           </div>
         )}
 
-        <div className="scroll-area space-y-5 overflow-y-auto">
+        <div className="scroll-area space-y-6 overflow-y-auto">
           {Object.entries(groups).map(([trick, items]) => (
             <div key={trick}>
-              <div className="mb-2 flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-neutral-200">{trick}</h3>
-                <span className="rounded-full bg-neutral-800 px-2 py-0.5 text-[10px] text-neutral-400">
-                  {items.length}
+              <div className="mb-2 flex items-baseline gap-2">
+                <h3 className="text-sm font-bold tracking-tight">{trick}</h3>
+                <span className="label-mono">
+                  ×{String(items.length).padStart(2, "0")}
                 </span>
+                <span className="ml-2 h-px flex-1 bg-border" />
               </div>
               <div className="space-y-2">
                 {items.map((clip) => (
@@ -144,32 +152,27 @@ function RecentClipRow({ clip }: { clip: ClipRecord }) {
       });
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-surface p-3">
+    <div className="flex items-center gap-3 rounded-md border border-border bg-card p-3">
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-neutral-100">
+        <div className="truncate font-mono text-xs text-foreground">
           {clip.filename}
         </div>
-        <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-neutral-500">
+        <div className="mt-1 flex flex-wrap gap-x-3 font-mono text-[11px] tabular-nums text-muted-foreground">
           <span>{when}</span>
           {clip.duration_seconds != null && (
             <span>{clip.duration_seconds.toFixed(1)}s</span>
           )}
           {clip.in_point != null && clip.out_point != null && (
-            <span className="tabular-nums">
-              {formatTimePrecise(clip.in_point)}–{formatTimePrecise(clip.out_point)}
+            <span>
+              {formatTimePrecise(clip.in_point)}–
+              {formatTimePrecise(clip.out_point)}
             </span>
           )}
         </div>
       </div>
-      <span
-        className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-          clip.processed
-            ? "bg-emerald-500/15 text-emerald-300"
-            : "bg-neutral-700/40 text-neutral-300"
-        }`}
-      >
+      <Badge variant={clip.processed ? "solid" : "outline"}>
         {clip.processed ? "Processed" : "Raw"}
-      </span>
+      </Badge>
     </div>
   );
 }
