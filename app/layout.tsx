@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo, Space_Mono } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
+import { ServiceWorkerRegister } from "@/components/ServiceWorker";
 
 const archivo = Archivo({
   subsets: ["latin"],
@@ -55,6 +56,7 @@ export default function RootLayout({
     <html lang="en" className={`${archivo.variable} ${spaceMono.variable}`}>
       <body className="grain min-h-[100dvh] bg-background font-sans text-foreground antialiased">
         <ToastProvider>{children}</ToastProvider>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
